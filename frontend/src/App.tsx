@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type PredictPayload = {
   width: number;
@@ -71,6 +71,7 @@ function App() {
   const [estimatedPrice, setEstimatedPrice] = useState<number | null>(null);
   const [validationError, setValidationError] = useState<string>("");
   const [requestError, setRequestError] = useState<string>("");
+  const [healthError, setHealthError] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [resultAnimateKey, setResultAnimateKey] = useState<number>(0);
 
@@ -123,6 +124,25 @@ function App() {
     }
   };
 
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const checkHealth = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/health`, { signal: controller.signal });
+        if (!response.ok) {
+          throw new Error("Backend health check failed.");
+        }
+        setHealthError("");
+      } catch {
+        setHealthError("Backend is unavailable. Please start the API server.");
+      }
+    };
+
+    void checkHealth();
+    return () => controller.abort();
+  }, []);
+
   return (
     <main className="page">
       <section className="card">
@@ -130,6 +150,7 @@ function App() {
           <h1>Sign Price Predictor</h1>
           <p>Estimate project pricing instantly using trained ML predictions.</p>
         </header>
+        {healthError && <p className="message error">{healthError}</p>}
 
         <form onSubmit={handleSubmit} noValidate>
           <div className="grid two-col">

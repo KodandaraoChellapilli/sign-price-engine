@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import pickle
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -87,5 +88,11 @@ def get_estimated_price(
     )
     aligned = encoded.reindex(columns=_data_columns, fill_value=0)
 
-    prediction = float(_model.predict(aligned)[0])
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="X has feature names, but RandomForestRegressor was fitted without feature names",
+            category=UserWarning,
+        )
+        prediction = float(_model.predict(aligned)[0])
     return round(prediction, 2)

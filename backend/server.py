@@ -1,15 +1,21 @@
 from __future__ import annotations
 
+import importlib
+import logging
 import os
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-import utilits
+try:
+    model_utils = importlib.import_module("utilits")
+except ModuleNotFoundError:
+    model_utils = importlib.import_module("utils")
 
 
 app = FastAPI(title="Sign Price Predictor API", version="1.0.0")
+logger = logging.getLogger("uvicorn.error")
 
 allowed_origins = [
     origin.strip()
@@ -22,6 +28,7 @@ allowed_origins = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins if allowed_origins else ["*"],
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -54,7 +61,18 @@ class PredictResponse(BaseModel):
 
 @app.on_event("startup")
 def startup_load_artifacts() -> None:
-    utilits.load_saved_artifacts()
+    # Pickled scikit-learn models can warn or fail if training and runtime versions differ.
+    try:
+        model_utils.load_saved_artifacts()
+        logger.info("Model artifacts loaded successfully.")
+    except Exception:
+        logger.exception("Failed to load model artifacts during startup.")
+        raise
+
+
+@app.get("/")
+def root() -> dict[str, str]:
+    return {"status": "ok", "message": "Sign Price Predictor API is running"}
 
 
 @app.get("/health")
@@ -65,7 +83,7 @@ def health_check() -> dict[str, str]:
 @app.post("/predict", response_model=PredictResponse)
 def predict(payload: PredictRequest) -> PredictResponse:
     try:
-        price = utilits.get_estimated_price(
+        price = model_utils.get_estimated_price(
             width=payload.width,
             height=payload.height,
             sign_type=payload.sign_type,

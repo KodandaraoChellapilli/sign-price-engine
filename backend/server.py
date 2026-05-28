@@ -4,7 +4,7 @@ import importlib
 import logging
 import os
 
-from fastapi import FastAPI, HTTPException
+from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -14,26 +14,8 @@ except ModuleNotFoundError:
     model_utils = importlib.import_module("utils")
 
 
-app = FastAPI(title="Sign Price Predictor API", version="1.0.0")
+router = APIRouter()
 logger = logging.getLogger("uvicorn.error")
-
-allowed_origins = [
-    origin.strip()
-    for origin in os.getenv(
-        "CORS_ORIGINS",
-        "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173",
-    ).split(",")
-    if origin.strip()
-]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed_origins if allowed_origins else ["*"],
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 
 class PredictRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -59,7 +41,6 @@ class PredictResponse(BaseModel):
     estimated_price: float
 
 
-@app.on_event("startup")
 def startup_load_artifacts() -> None:
     # Pickled scikit-learn models can warn or fail if training and runtime versions differ.
     try:
@@ -70,17 +51,17 @@ def startup_load_artifacts() -> None:
         raise
 
 
-@app.get("/")
+@router.get("/")
 def root() -> dict[str, str]:
     return {"status": "ok", "message": "Sign Price Predictor API is running"}
 
 
-@app.get("/health")
+@router.get("/health")
 def health_check() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.post("/predict", response_model=PredictResponse)
+@router.post("/predict", response_model=PredictResponse)
 def predict(payload: PredictRequest) -> PredictResponse:
     try:
         price = model_utils.get_estimated_price(
@@ -101,3 +82,34 @@ def predict(payload: PredictRequest) -> PredictResponse:
         raise HTTPException(status_code=500, detail="Prediction failed") from exc
 
     return PredictResponse(estimated_price=price)
+
+
+def _get_allowed_origins() -> list[str]:
+    return [
+        origin.strip()
+        for origin in os.getenv(
+            "CORS_ORIGINS",
+            "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173",
+        ).split(",")
+        if origin.strip()
+    ]
+
+
+def create_app() -> FastAPI:
+    app = FastAPI(title="Sign Price Predictor API", version="1.0.0")
+    allowed_origins = _get_allowed_origins()
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins if allowed_origins else ["*"],
+        allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    app.add_event_handler("startup", startup_load_artifacts)
+    app.include_router(router)
+    return app
+
+
+# Backward-compatible module-level ASGI app. Deployment entry point is app.py.
+app = create_app()

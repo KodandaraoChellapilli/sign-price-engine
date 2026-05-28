@@ -110,6 +110,11 @@ Deployment
 Backend can be deployed on Render / Railway
 Frontend can be deployed on Vercel
 Model file (pickle) and columns.json are loaded at runtime for predictions
+Render backend settings (repo root service):
+- Root Directory: leave empty (repo root)
+- Build Command: pip install --upgrade pip setuptools wheel && pip install --only-binary=:all: -r requirements.txt
+- Start Command: uvicorn app:app --app-dir backend --host 0.0.0.0 --port 10000
+- Python version is pinned via root runtime.txt to python-3.11.8
 Key Takeaways
 Built full ML pipeline from data generation → model training → deployment
 Performed feature engineering and encoding

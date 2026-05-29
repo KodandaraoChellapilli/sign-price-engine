@@ -1,13 +1,15 @@
 services:
   - type: web
-    name: sign-price-engine-4
+    name: estateiq-backend
     env: python
-
+    rootDir: backend
     plan: free
 
-    rootDir: backend
-    buildCommand: pip install -r requirements.txt
+    runtime: python-3.11.9
 
-    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    buildCommand: pip install --only-binary=:all: -r requirements.txt
 
-    runtime: python-3.11.8
+    startCommand: gunicorn --bind 0.0.0.0:$PORT server:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9

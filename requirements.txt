@@ -1,6 +1,1 @@
-Python: 3.10.13
-scikit-learn: 1.3.2
-pandas: latest stable
-numpy: latest stable
-fastapi: latest stable
-uvicorn: latest stable
+-r backend/requirements.txt

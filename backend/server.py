@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 try:
     model_utils = importlib.import_module("utilits")
 except ModuleNotFoundError:
-    model_utils = importlib.import_module("utils")
+    model_utils = importlib.import_module("backend.utilits")
 
 
 router = APIRouter()
@@ -89,27 +89,25 @@ def _get_allowed_origins() -> list[str]:
         origin.strip()
         for origin in os.getenv(
             "CORS_ORIGINS",
-            "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173",
+            (
+                "http://localhost:3000,http://127.0.0.1:3000,"
+                "http://localhost:5173,http://127.0.0.1:5173"
+            ),
         ).split(",")
         if origin.strip()
     ]
 
 
-def create_app() -> FastAPI:
-    app = FastAPI(title="Sign Price Predictor API", version="1.0.0")
-    allowed_origins = _get_allowed_origins()
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=allowed_origins if allowed_origins else ["*"],
-        allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-    app.add_event_handler("startup", startup_load_artifacts)
-    app.include_router(router)
-    return app
-
-
-# Backward-compatible module-level ASGI app. Deployment entry point is app.py.
-app = create_app()
+# Render deployment entry point: uvicorn server:app --host 0.0.0.0 --port $PORT
+app = FastAPI(title="Sign Price Predictor API", version="1.0.0")
+allowed_origins = _get_allowed_origins()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins if allowed_origins else ["*"],
+    allow_origin_regex=r"^https://([a-zA-Z0-9-]+\.)*vercel\.app$|^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+app.add_event_handler("startup", startup_load_artifacts)
+app.include_router(router)
